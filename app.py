@@ -2,23 +2,17 @@ import streamlit as st
 import pandas as pd
 import joblib
 import plotly.express as px
+import plotly.graph_objects as go
 
-import plotly.express as px
-
-
-
-# ✅ Set page configuration
 st.set_page_config(
     page_title="🧠 Student Depression Prediction App",
     layout="centered",
     initial_sidebar_state="expanded"
 )
 
-# ✅ Load model and scaler
 logreg = joblib.load("logistic_regression_model.pkl")
 scaler = joblib.load("scaler.pkl")
 
-# ✅ Prediction and suggestion functions
 def risk_pred(probability):
     if probability < 0.40:
         return "Low risk of depression"
@@ -58,7 +52,6 @@ def give_suggestions(user_data, risk_category):
 
     return suggestion_list
 
-# ✅ Sidebar content
 with st.sidebar:
     st.header("🧠 About This App")
     st.write("""
@@ -69,13 +62,10 @@ with st.sidebar:
     st.markdown("---")
     st.write("Developed with ❤️ for student mental wellness.")
 
-# ✅ Main title
 st.title("🎓 Student Depression Prediction App")
 
-# ✅ Input fields (blank, with validation)
 st.markdown("### ✍️ Please fill in the following details:")
 
-# Inputs
 age_input = st.text_input("🎂 Age")
 academic_pressure_input = st.text_input("📘 Academic Pressure (0-5)")
 work_pressure_input = st.text_input("💼 Work Pressure (0-5)")
@@ -98,7 +88,6 @@ suicide_map = {"No": 0, "Yes": 1}
 family_history = st.selectbox("👨‍👩‍👧 Family History of Mental Illness", ["No", "Yes"])
 family_map = {"No": 0, "Yes": 1}
 
-# ✅ Prediction
 if st.button("🔍 Predict Depression Risk"):
     required_fields = [
         age_input, academic_pressure_input, work_pressure_input, cgpa_input,
@@ -110,7 +99,6 @@ if st.button("🔍 Predict Depression Risk"):
         st.error("❗ Please fill in all the numeric input fields before predicting.")
     else:
         try:
-            # Convert inputs
             age = int(age_input)
             academic_pressure = float(academic_pressure_input)
             work_pressure = float(work_pressure_input)
@@ -121,7 +109,6 @@ if st.button("🔍 Predict Depression Risk"):
             work_study_hours = float(work_hours_input)
             financial_stress = float(financial_stress_input)
 
-            # Prepare DataFrame
             user_data = pd.DataFrame({
                 'Age': [age],
                 'Academic Pressure': [academic_pressure],
@@ -138,17 +125,49 @@ if st.button("🔍 Predict Depression Risk"):
                 'Family History of Mental Illness': [family_map[family_history]]
             })
 
-            # Scale, Predict, Interpret
             scaled_user_data = scaler.transform(user_data)
             probability = logreg.predict_proba(scaled_user_data)[0][1]
             result = risk_pred(probability)
 
-            # Show Results
+            radar_fig = go.Figure()
+            radar_fig.add_trace(go.Scatterpolar(
+                r=user_data.values[0],
+                theta=user_data.columns,
+                fill='toself',
+                name='Your Input Profile'
+            ))
+            radar_fig.update_layout(
+                polar=dict(radialaxis=dict(visible=True, range=[0, max(user_data.values[0]) + 1])),
+                showlegend=False,
+                title="🧭 Personal Lifestyle Radar Chart"
+            )
+            st.plotly_chart(radar_fig)
+
+           
             st.markdown(f"### 🎯 Predicted Probability of Depression: **{round(probability*100, 2)} %**")
             st.markdown(f"### 🧠 Risk Level: **{result}**")
-            #st.markdown("### 🌀 Your Wellness Radar Chart")
-            #show_radar_chart(user_data)
-
+            
+            gauge_fig = go.Figure(go.Indicator(
+                mode="gauge+number+delta",
+                value=round(probability * 100, 2),
+                delta={'reference': 50},
+                title={'text': "🧠 Depression Risk Level (%)"},
+                gauge={
+                    'axis': {'range': [0, 100]},
+                    'bar': {'color': "darkblue"},
+                    'steps': [
+                        {'range': [0, 40], 'color': "lightgreen"},
+                        {'range': [40, 70], 'color': "orange"},
+                        {'range': [70, 100], 'color': "red"},
+                    ],
+                    'threshold': {
+                        'line': {'color': "black", 'width': 4},
+                        'thickness': 0.75,
+                        'value': round(probability * 100, 2),
+                    }
+                }
+            ))
+            st.plotly_chart(gauge_fig)
 
             st.markdown("---")
             st.markdown("### 💡 Personalized Suggestions:")
